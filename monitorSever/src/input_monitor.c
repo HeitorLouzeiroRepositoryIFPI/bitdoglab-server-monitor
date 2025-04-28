@@ -3,6 +3,7 @@
 #include "hardware/gpio.h"
 #include "pico/stdlib.h"
 #include <stdio.h>
+#include <string.h>
 
 #define PINO_BOTAO_1 5
 #define PINO_BOTAO_2 6
@@ -47,19 +48,36 @@ void inicializarMonitorEntrada(void) {
 void monitorarBotoes(void) {
     static bool ultimoEstadoBotao1 = false;
     static bool ultimoEstadoBotao2 = false;
+    static char ultimaDirecao[20] = "Centro";
 
     bool estadoBotao1 = !gpio_get(PINO_BOTAO_1);
     bool estadoBotao2 = !gpio_get(PINO_BOTAO_2);
 
+    // Leitura do joystick
+    adc_select_input(0);  // X
+    int x = adc_read();
+    adc_select_input(1);  // Y
+    int y = adc_read();
+    const char* direcaoAtual = mapearDirecaoJoystick(x, y);
+
+    // Monitoramento dos botões
     if (estadoBotao1 != ultimoEstadoBotao1) {
         ultimoEstadoBotao1 = estadoBotao1;
         snprintf(mensagemBotao1, sizeof(mensagemBotao1),
                  estadoBotao1 ? "Botão 1 foi pressionado!" : "Botão 1 foi solto!");
+        printf("%s\n", mensagemBotao1);  // Print do estado do botão 1
     }
 
     if (estadoBotao2 != ultimoEstadoBotao2) {
         ultimoEstadoBotao2 = estadoBotao2;
         snprintf(mensagemBotao2, sizeof(mensagemBotao2),
                  estadoBotao2 ? "Botão 2 foi pressionado!" : "Botão 2 foi solto!");
+        printf("%s\n", mensagemBotao2);  // Print do estado do botão 2
+    }
+
+    // Monitoramento do joystick
+    if (strcmp(direcaoAtual, ultimaDirecao) != 0) {
+        printf("Joystick movido para: %s (X: %d, Y: %d)\n", direcaoAtual, x, y);
+        strcpy(ultimaDirecao, direcaoAtual);
     }
 }
