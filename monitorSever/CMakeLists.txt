@@ -35,7 +35,7 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(monitorSever monitorSever.c )
+add_executable(monitorSever monitorSever.c src/input_monitor.c src/wifi_manager.c src/http_server.c)
 
 pico_set_program_name(monitorSever "monitorSever")
 pico_set_program_version(monitorSever "0.1")
@@ -59,6 +59,7 @@ target_link_libraries(monitorSever
 # Add the standard include files to the build
 target_include_directories(monitorSever PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
+        ${CMAKE_CURRENT_LIST_DIR}/include
 )
 
 # Add any user requested libraries
