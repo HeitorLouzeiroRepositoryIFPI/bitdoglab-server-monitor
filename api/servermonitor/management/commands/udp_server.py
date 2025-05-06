@@ -3,7 +3,7 @@ import socket
 import threading
 import time
 from django.core.management.base import BaseCommand
-from servermonitor.models import ServerStatus
+from servermonitor.models import ServerStatus, Temperature
 
 #python3 manage.py udp_server --ip=10.8.45.122 --porta=4444
 
@@ -70,20 +70,33 @@ class Command(BaseCommand):
                     # Tentar fazer parse do JSON recebido
                     dados_json = json.loads(data.decode('utf-8'))
                     
-                    # Mapear valores booleanos para as escolhas do modelo
-                    botao1 = '0' if dados_json.get('botao1', False) else '1'
-                    botao2 = '0' if dados_json.get('botao2', False) else '1'
-                    
-                    # Salvar no banco de dados
-                    ServerStatus.objects.create(
-                        button_one=botao1,
-                        button_two=botao2,
-                        joystick_x=dados_json.get('joystick_x', 2000),
-                        joystick_y=dados_json.get('joystick_y', 2000),
-                        direction=dados_json.get('direcao', 'Centro')
-                    )
-                    
-                    self.stdout.write(self.style.SUCCESS(f'Dados salvos no banco: {dados_json}'))
+                    # Verificar se os dados contêm informação de temperatura
+                    if 'temperatura' in dados_json:
+                        # Processar dados de temperatura
+                        temperatura = dados_json.get('temperatura')
+                        
+                        # Salvar no banco de dados
+                        Temperature.objects.create(
+                            temperature=temperatura
+                        )
+                        
+                        self.stdout.write(self.style.SUCCESS(f'Dados de temperatura salvos: {temperatura}°C'))
+                    else:
+                        # Processar dados de status do servidor (joystick e botões)
+                        # Mapear valores booleanos para as escolhas do modelo
+                        botao1 = '0' if dados_json.get('botao1', False) else '1'
+                        botao2 = '0' if dados_json.get('botao2', False) else '1'
+                        
+                        # Salvar no banco de dados
+                        ServerStatus.objects.create(
+                            button_one=botao1,
+                            button_two=botao2,
+                            joystick_x=dados_json.get('joystick_x', 2000),
+                            joystick_y=dados_json.get('joystick_y', 2000),
+                            direction=dados_json.get('direcao', 'Centro')
+                        )
+                        
+                        self.stdout.write(self.style.SUCCESS(f'Dados de status salvos: {dados_json}'))
                     
                     # Opcionalmente, enviar uma resposta de confirmação
                     resposta = json.dumps({"status": "ok", "message": "Dados recebidos com sucesso"})
