@@ -6,6 +6,7 @@ import ServerStatusPanel from './components/ServerStatusPanel';
 import JoystickVisualizer from './components/JoystickVisualizer';
 import ButtonStatusPanel from './components/ButtonStatusPanel';
 import Header from './components/Header';
+import TemperatureDisplay from './components/TemperatureDisplay';
 
 // Temas claro e escuro
 const lightTheme = {
@@ -72,13 +73,13 @@ const DashboardContainer = styled.div`
   grid-template-rows: auto auto;
   grid-template-areas: 
     "server server server server joystick joystick joystick joystick button button button button"
-    "stats stats stats stats stats stats stats stats stats stats stats stats";
+    "temp temp temp temp temp temp temp temp temp temp temp temp";
   gap: 20px;
   
   @media (max-width: 992px) {
     grid-template-areas: 
       "server server server server joystick joystick joystick joystick button button button button"
-      "stats stats stats stats stats stats stats stats stats stats stats stats";
+      "temp temp temp temp temp temp temp temp temp temp temp temp";
   }
   
   @media (max-width: 768px) {
@@ -87,7 +88,7 @@ const DashboardContainer = styled.div`
       "server"
       "joystick"
       "button"
-      "stats";
+      "temp";
   }
 `;
 
@@ -121,8 +122,8 @@ const ButtonArea = styled.div`
   }
 `;
 
-const StatsArea = styled.div`
-  grid-area: stats;
+const TemperatureArea = styled.div`
+  grid-area: temp;
   opacity: 0;
   animation: fadeIn 0.5s ease forwards;
   animation-delay: 0.3s;
@@ -280,11 +281,9 @@ function App() {
             />
           </ButtonArea>
           
-          <StatsArea>
-            <div id="stats-container">
-              {/* Futura área para gráficos e estatísticas adicionais */}
-            </div>
-          </StatsArea>
+          <TemperatureArea>
+            <TemperatureDisplay />
+          </TemperatureArea>
         </DashboardContainer>
         
         <ThemeToggleButton onClick={toggleTheme}>
