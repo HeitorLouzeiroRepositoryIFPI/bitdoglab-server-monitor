@@ -4,24 +4,43 @@
 #include "lwip/udp.h"
 #include <string.h>
 #include <stdio.h>
+#include <math.h>  // Adicionando math.h para fabs() e NAN
 #include "hardware/adc.h"
 
+// Definição de pinos
 #define PINO_BOTAO_1 5
 #define PINO_BOTAO_2 6
-#define SSID_WIFI "Embarca"
-#define SENHA_WIFI "EmbarcaTech01"
 #define JOYSTICK_EIXO_X 27
 #define JOYSTICK_EIXO_Y 26
 
-// Configurações para UDP
+// Configurações de rede
+#define SSID_WIFI "Embarca"
+#define SENHA_WIFI "EmbarcaTech01"
 #define UDP_PORT 4444
-#define UDP_INTERVALO_MS 200 // Intervalo entre envios UDP
 
-// Endereço IP do servidor receptor (substitua pelos valores corretos)
+// Constantes de tempo (em ms)
+#define TEMPO_RETRY_WIFI 2000
+#define TEMPO_TIMEOUT_WIFI 10000
+#define TEMPO_VERIFICACAO_CONEXAO 5000
+#define TEMPO_ATUALIZACAO_TEMPERATURA 60000
+#define TEMPO_ENVIO_UDP 200          // Intervalo para verificação de envio UDP
+#define TEMPO_DELAY_LOOP 10
+#define TEMPO_INIT_DELAY 10000
+
+// Configurações do joystick
+#define LIMIAR_MUDANCA_JOYSTICK 800
+#define JOYSTICK_LIMITE_INFERIOR 1500
+#define JOYSTICK_LIMITE_SUPERIOR 2500
+
+// Configurações de temperatura
+#define LIMIAR_MUDANCA_TEMPERATURA 0.5f
+#define ENVIAR_TEMP_POR_MUDANCA false     // Se true, envia quando mudar; se false, envia no intervalo fixo
+
+// Configuração IP do servidor receptor
 #define SERVIDOR_IP_0 10
 #define SERVIDOR_IP_1 8
 #define SERVIDOR_IP_2 45
-#define SERVIDOR_IP_3 122  // Substitua pelo IP correto do seu servidor Django
+#define SERVIDOR_IP_3 122
 
 // Estrutura para manter o estado do UDP
 struct udp_state {
@@ -72,12 +91,28 @@ const char* mapearDirecaoJoystick(int x, int y) {
     return "Centro";
 }
 
+// Função para ler a temperatura do sensor interno do RP2040
+float read_temperature_celsius() {
+    adc_select_input(4);  // Seleciona o canal do sensor de temperatura interno
+    uint16_t raw = adc_read();  // Lê o valor bruto do ADC
+    float voltage = raw * 3.3f / 4095.0f;  // Converte o valor ADC para tensão
+    float temp_celsius = 27.0f - (voltage - 0.706f) / 0.001721f;  // Converte a tensão para temperatura
+
+    float temp_fahrenheit = temp_celsius * 9.0f / 5.0f + 32.0f;  // Converte para Fahrenheit (opcional)
+
+    //printf("ADC Raw: %d | Tensão: %.4f V | Temp: %.2f °C | %.2f °F\n", raw, voltage, temp_celsius, temp_fahrenheit);
+
+    return (temp_celsius < -10.0f || temp_celsius > 100.0f) ? NAN : temp_celsius;  // Se a temperatura estiver fora da faixa válida, retorna "não numérico"
+}
+
 void criarStatusJson(int x, int y) {
     const char* direcao = mapearDirecaoJoystick(x, y);
+    float temperatura = read_temperature_celsius();
+    
     snprintf(respostaJson, sizeof(respostaJson),
         "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n"
-        "{\"botao1\": \"%s\", \"botao2\": \"%s\", \"direcao\": \"%s\"}",
-        mensagemBotao1, mensagemBotao2, direcao);
+        "{\"botao1\": \"%s\", \"botao2\": \"%s\", \"direcao\": \"%s\", \"temperatura\": %.2f}",
+        mensagemBotao1, mensagemBotao2, direcao, temperatura);
 }
 
 static err_t callbackHttp(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) {
@@ -210,9 +245,10 @@ void enviar_dados_udp(const char *dados, int tamanho) {
 
 char dados_udp[256];
 
-// Prepara dados para envio UDP
+// Prepara dados para envio UDP - somente joystick e botões
 void preparar_dados_udp(int x, int y, bool botao1, bool botao2) {
     const char* direcao = mapearDirecaoJoystick(x, y);
+    
     snprintf(dados_udp, sizeof(dados_udp),
              "{"
              "\"joystick_x\": %d,"
@@ -225,6 +261,34 @@ void preparar_dados_udp(int x, int y, bool botao1, bool botao2) {
     
     printf("[INFO] Dados preparados: x=%d, y=%d, direcao=%s, botao1=%d, botao2=%d\n", 
            x, y, direcao, botao1, botao2);
+}
+
+// Nova função para dados de temperatura
+void preparar_dados_temperatura(float temperatura) {
+    char dados_temperatura[128];
+    
+    snprintf(dados_temperatura, sizeof(dados_temperatura),
+             "{"
+             "\"temperatura\": %.2f"
+             "}",
+             temperatura);
+    
+    printf("[INFO] Dados de temperatura: %.2f°C\n", temperatura);
+    
+    // Enviar dados de temperatura separadamente
+    enviar_dados_udp(dados_temperatura, strlen(dados_temperatura));
+}
+
+// Verifica se deve enviar dados de temperatura com base na configuração
+bool deve_enviar_temperatura(float temperatura_atual, float ultima_temperatura, uint32_t tempo_atual, uint32_t ultimo_envio) {
+    // Se configurado para enviar por mudança
+    if (ENVIAR_TEMP_POR_MUDANCA) {
+        return fabs(temperatura_atual - ultima_temperatura) > LIMIAR_MUDANCA_TEMPERATURA;
+    } 
+    // Caso contrário, envia por intervalo de tempo
+    else {
+        return (tempo_atual - ultimo_envio >= TEMPO_ATUALIZACAO_TEMPERATURA);
+    }
 }
 
 void monitorarBotoes() {
@@ -293,6 +357,13 @@ int main() {
     adc_init();
     adc_gpio_init(JOYSTICK_EIXO_X);
     adc_gpio_init(JOYSTICK_EIXO_Y);
+    // Habilita o sensor de temperatura interno
+    adc_set_temp_sensor_enabled(true);
+    printf("Sensor de temperatura interno habilitado\n");
+    
+    // Faz uma leitura inicial da temperatura
+    float temp_inicial = read_temperature_celsius();
+    printf("Temperatura inicial: %.2f °C\n");
 
     iniciarServidorHttp();
     
@@ -304,12 +375,14 @@ int main() {
     // Contador para controlar o intervalo de envio UDP
     uint32_t ultimo_envio_udp = 0;
     uint32_t ultimo_check_conexao = 0;
+    uint32_t ultimo_envio_temperatura = 0;  // Para enviar a temperatura periodicamente
     
     // Adicione isso ao seu código para enviar apenas quando houver mudanças
     static int ultimo_x = 0;
     static int ultimo_y = 0;
     static bool ultimo_botao1 = false;
     static bool ultimo_botao2 = false;
+    static float ultima_temperatura = 0.0f;  // Para monitorar mudanças de temperatura
 
     while (true) {
         monitorarBotoes();
@@ -340,10 +413,12 @@ int main() {
         }
         
         // Verifica se é hora de enviar dados UDP
-        if (tempo_atual - ultimo_envio_udp >= UDP_INTERVALO_MS) {
-            // Define uma zona morta ainda maior para o joystick
-            // Ignora pequenas variações que são apenas ruído do sensor analógico
-            bool mudanca_joystick = (abs(x - ultimo_x) > 800 || abs(y - ultimo_y) > 800);
+        if (tempo_atual - ultimo_envio_udp >= TEMPO_ENVIO_UDP) {
+            // Lê a temperatura atual
+            float temperatura_atual = read_temperature_celsius();
+            
+            // Verifica se houve mudança nos botões ou uma mudança significativa no joystick
+            bool mudanca_joystick = (abs(x - ultimo_x) > LIMIAR_MUDANCA_JOYSTICK || abs(y - ultimo_y) > LIMIAR_MUDANCA_JOYSTICK);
             
             // Ou se houve mudança na direção do joystick (mesmo que pequena mas suficiente para mudar a direção)
             const char* direcao_atual = mapearDirecaoJoystick(x, y);
@@ -365,6 +440,7 @@ int main() {
                                         botao1_estado != ultimo_botao1 ||
                                         botao2_estado != ultimo_botao2);
                                         
+            // Envio de dados APENAS quando houver mudanças reais nos botões ou joystick
             if (mudanca_significativa) {
                 // Prepara e envia os dados via UDP
                 preparar_dados_udp(x, y, botao1_estado, botao2_estado);
@@ -375,6 +451,13 @@ int main() {
                 ultimo_y = y;
                 ultimo_botao1 = botao1_estado;
                 ultimo_botao2 = botao2_estado;
+            }
+            
+            // Verifica se deve enviar dados de temperatura com base na configuração
+            if (deve_enviar_temperatura(temperatura_atual, ultima_temperatura, tempo_atual, ultimo_envio_temperatura)) {
+                preparar_dados_temperatura(temperatura_atual);
+                ultimo_envio_temperatura = tempo_atual;
+                ultima_temperatura = temperatura_atual;
             }
             
             ultimo_envio_udp = tempo_atual;
