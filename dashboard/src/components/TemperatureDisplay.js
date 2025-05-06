@@ -134,10 +134,10 @@ const TemperatureDisplay = () => {
   useEffect(() => {
     fetchTemperatureData();
     
-    // Atualizar a cada 30 segundos
+    // Atualizar a cada 1 minuto
     const interval = setInterval(() => {
       fetchTemperatureData();
-    }, 30000);
+    }, 60000);
     
     return () => clearInterval(interval);
   }, []);

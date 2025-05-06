@@ -190,10 +190,13 @@ function App() {
         setConnectionStatus(true);
       }
       setLoading(false);
+      setError(null); // Clear any previous errors
     } catch (err) {
       console.error('Erro ao buscar dados:', err);
-      setError('Não foi possível conectar ao servidor. Verifique se a API está rodando.');
+      // Show alert instead of error page
+      alert('Não foi possível conectar ao servidor. Verifique se a API está rodando.');
       setConnectionStatus(false);
+      // Keep using the last server status we had
       setLoading(false);
     }
   };
@@ -226,31 +229,7 @@ function App() {
     );
   }
 
-  if (error) {
-    return (
-      <ThemeProvider theme={darkMode ? darkTheme : lightTheme}>
-        <GlobalStyle />
-        <div className="error-container">
-          <div style={{ fontSize: '50px', marginBottom: '20px' }}>⚠️</div>
-          <p>{error}</p>
-          <button 
-            onClick={fetchData}
-            style={{
-              marginTop: '20px',
-              padding: '10px 20px',
-              background: darkMode ? darkTheme.accent : lightTheme.accent,
-              color: 'white',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer'
-            }}
-          >
-            Tentar novamente
-          </button>
-        </div>
-      </ThemeProvider>
-    );
-  }
+  // Remove the error condition check so we always show the dashboard
 
   return (
     <ThemeProvider theme={darkMode ? darkTheme : lightTheme}>
