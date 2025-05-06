@@ -35,7 +35,10 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(monitorSever monitorSever.c )
+add_executable(monitorSever 
+    monitorSever.c
+    ssd1306.c
+)
 
 pico_set_program_name(monitorSever "monitorSever")
 pico_set_program_version(monitorSever "0.1")
@@ -46,7 +49,6 @@ pico_enable_stdio_usb(monitorSever 1)
 
 # Add the standard library to the build
 target_link_libraries(monitorSever
-        pico_stdlib
         pico_stdlib
         pico_cyw43_arch_lwip_threadsafe_background
         hardware_i2c 

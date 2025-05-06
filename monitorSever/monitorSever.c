@@ -6,12 +6,18 @@
 #include <stdio.h>
 #include <math.h>  // Adicionando math.h para fabs() e NAN
 #include "hardware/adc.h"
+#include "hardware/i2c.h" // Para o display OLED
+#include "ssd1306.h"      // Nossa biblioteca OLED
 
 // Definição de pinos
 #define PINO_BOTAO_1 5
 #define PINO_BOTAO_2 6
 #define JOYSTICK_EIXO_X 27
 #define JOYSTICK_EIXO_Y 26
+
+// Pinos I2C para o display OLED (baseado no exemplo BitDogLab)
+#define PINO_SDA 14
+#define PINO_SCL 15
 
 // Configurações de rede
 #define SSID_WIFI "Embarca"
@@ -291,6 +297,97 @@ bool deve_enviar_temperatura(float temperatura_atual, float ultima_temperatura, 
     }
 }
 
+// Funções para gerenciar o display OLED
+bool display_inicializado = false;
+
+// Inicializa o display OLED
+bool inicializar_display_oled() {
+    printf("Inicializando display OLED...\n");
+    
+    // Configura e inicializa o display utilizando os pinos definidos
+    bool resultado = ssd1306_init(i2c1, PINO_SDA, PINO_SCL);
+    
+    if (resultado) {
+        printf("Display OLED inicializado com sucesso!\n");
+        
+        // Desenha uma tela de boas-vindas
+        ssd1306_clear();
+        ssd1306_draw_text(5, 5, "Monitor Server", false);
+        ssd1306_draw_text(5, 20, "BitDogLab v1.0", false);
+        ssd1306_draw_text(5, 40, "Iniciando...", false);
+        ssd1306_display();
+        sleep_ms(2000);
+        
+        display_inicializado = true;
+    } else {
+        printf("Falha ao inicializar o display OLED\n");
+    }
+    
+    return resultado;
+}
+
+// Atualiza o display OLED com as informações do sistema
+void atualizar_display_oled(float temperatura, int x, int y, bool botao1, bool botao2, bool wifi_conectado) {
+    if (!display_inicializado) return;
+    
+    // Limpa o display
+    ssd1306_clear();
+    
+    // Exibe o cabeçalho
+    ssd1306_draw_text(0, 0, "Monitor Server", false);
+    
+    // Linha separadora
+    ssd1306_draw_line(0, 10, 128, 10, true);
+    
+    // Exibe a temperatura
+    char temp_str[20];
+    snprintf(temp_str, sizeof(temp_str), "Temp: %.1f C", temperatura);
+    ssd1306_draw_text(0, 14, temp_str, false);
+    
+    // Status de conexão WiFi
+    char wifi_str[20];
+    snprintf(wifi_str, sizeof(wifi_str), "WiFi: %s", wifi_conectado ? "ON" : "OFF");
+    ssd1306_draw_text(0, 24, wifi_str, false);
+    
+    // Direção do joystick
+    const char* direcao = mapearDirecaoJoystick(x, y);
+    char joystick_str[30];
+    snprintf(joystick_str, sizeof(joystick_str), "Dir: %s", direcao);
+    ssd1306_draw_text(0, 34, joystick_str, false);
+    
+    // Status dos botões
+    char botoes_str[30];
+    snprintf(botoes_str, sizeof(botoes_str), "B1:%s B2:%s", 
+             botao1 ? "ON" : "OFF", 
+             botao2 ? "ON" : "OFF");
+    ssd1306_draw_text(0, 44, botoes_str, false);
+    
+    // Atualiza o display
+    ssd1306_display();
+}
+
+// Exibe a tela de status da conexão Wi-Fi
+void exibir_status_wifi_oled(const char* mensagem, uint8_t ip0, uint8_t ip1, uint8_t ip2, uint8_t ip3) {
+    if (!display_inicializado) return;
+    
+    ssd1306_clear();
+    ssd1306_draw_text(0, 0, "Status WiFi", false);
+    ssd1306_draw_line(0, 10, 128, 10, true);
+    
+    ssd1306_draw_text(0, 14, mensagem, false);
+    
+    if (ip0 > 0) {
+        char ip_str[20];
+        snprintf(ip_str, sizeof(ip_str), "IP: %d.%d.%d.%d", ip0, ip1, ip2, ip3);
+        ssd1306_draw_text(0, 30, ip_str, false);
+    }
+    
+    ssd1306_display();
+}
+
+// Define um tempo para atualização do display
+#define TEMPO_ATUALIZACAO_DISPLAY 500  // Atualiza a cada 500ms
+
 void monitorarBotoes() {
     static bool ultimoEstadoBotao1 = false;
     static bool ultimoEstadoBotao2 = false;
@@ -318,8 +415,19 @@ int main() {
     printf("Versão do Monitor: 1.0.0\n");
     printf("Iniciando servidor HTTP e UDP\n");
 
+    // Inicializa o display OLED
+    inicializar_display_oled();
+    
+    if (display_inicializado) {
+        exibir_status_wifi_oled("Conectando Wi-Fi...", 0, 0, 0, 0);
+    }
+
     if (cyw43_arch_init()) {
         printf("Erro ao inicializar Wi-Fi\n");
+        if (display_inicializado) {
+            exibir_status_wifi_oled("Erro Wi-Fi!", 0, 0, 0, 0);
+            sleep_ms(2000);
+        }
         return 1;
     }
 
@@ -329,10 +437,22 @@ int main() {
     // Tenta conectar ao Wi-Fi com retry
     int tentativas = 0;
     while (tentativas < 3) {
+        if (display_inicializado) {
+            char msg[30];
+            snprintf(msg, sizeof(msg), "Tentativa %d...", tentativas + 1);
+            exibir_status_wifi_oled(msg, 0, 0, 0, 0);
+        }
+        
         if (cyw43_arch_wifi_connect_timeout_ms(SSID_WIFI, SENHA_WIFI, CYW43_AUTH_WPA2_AES_PSK, 10000) == 0) {
             printf("Conectado ao Wi-Fi!\n");
             uint8_t *enderecoIp = (uint8_t*)&(cyw43_state.netif[0].ip_addr.addr);
             printf("IP: %d.%d.%d.%d\n", enderecoIp[0], enderecoIp[1], enderecoIp[2], enderecoIp[3]);
+            
+            if (display_inicializado) {
+                exibir_status_wifi_oled("Conectado!", enderecoIp[0], enderecoIp[1], enderecoIp[2], enderecoIp[3]);
+                sleep_ms(2000);
+            }
+            
             break;
         }
         
@@ -343,6 +463,10 @@ int main() {
     
     if (tentativas >= 3) {
         printf("Falha ao conectar ao Wi-Fi após múltiplas tentativas\n");
+        if (display_inicializado) {
+            exibir_status_wifi_oled("Falha na conexao!", 0, 0, 0, 0);
+            sleep_ms(2000);
+        }
         return 1;
     }
 
@@ -376,6 +500,7 @@ int main() {
     uint32_t ultimo_envio_udp = 0;
     uint32_t ultimo_check_conexao = 0;
     uint32_t ultimo_envio_temperatura = 0;  // Para enviar a temperatura periodicamente
+    uint32_t ultimo_update_display = 0;    // Para controlar a atualização do display
     
     // Adicione isso ao seu código para enviar apenas quando houver mudanças
     static int ultimo_x = 0;
@@ -383,6 +508,18 @@ int main() {
     static bool ultimo_botao1 = false;
     static bool ultimo_botao2 = false;
     static float ultima_temperatura = 0.0f;  // Para monitorar mudanças de temperatura
+    
+    if (display_inicializado) {
+        // Mostra informações iniciais no display
+        ssd1306_clear();
+        ssd1306_draw_text(0, 0, "Monitor Server v1.0", false);
+        ssd1306_draw_line(0, 10, 128, 10, true);
+        ssd1306_draw_text(0, 14, "Servidor HTTP: OK", false);
+        ssd1306_draw_text(0, 24, "Cliente UDP: OK", false);
+        ssd1306_draw_text(0, 40, "Iniciando...", false);
+        ssd1306_display();
+        sleep_ms(2000);
+    }
 
     while (true) {
         monitorarBotoes();
@@ -393,17 +530,9 @@ int main() {
         adc_select_input(0);
         int y = adc_read();
         
-        //printf("[JOYSTICK] Valores brutos: X=%d, Y=%d\n", x, y);
-        
         // Estado dos botões
         bool botao1_estado = !gpio_get(PINO_BOTAO_1);
         bool botao2_estado = !gpio_get(PINO_BOTAO_2);
-        
-        // if (botao1_estado || botao2_estado) {
-        //     printf("[BOTOES] Estado: Botão 1=%s, Botão 2=%s\n", 
-        //           botao1_estado ? "PRESSIONADO" : "SOLTO", 
-        //           botao2_estado ? "PRESSIONADO" : "SOLTO");
-        // }
         
         // Verificar conexão UDP periodicamente (a cada 5 segundos)
         uint32_t tempo_atual = to_ms_since_boot(get_absolute_time());
@@ -461,6 +590,17 @@ int main() {
             }
             
             ultimo_envio_udp = tempo_atual;
+        }
+        
+        // Atualiza o display OLED periodicamente
+        if (display_inicializado && (tempo_atual - ultimo_update_display >= TEMPO_ATUALIZACAO_DISPLAY)) {
+            float temperatura_atual = read_temperature_celsius();
+            // Substituindo a função cyw43_arch_is_connected() por uma verificação do estado do WiFi
+            bool wifi_conectado = cyw43_wifi_link_status(&cyw43_state, CYW43_ITF_STA) == CYW43_LINK_JOIN;
+            
+            atualizar_display_oled(temperatura_atual, x, y, botao1_estado, botao2_estado, wifi_conectado);
+            
+            ultimo_update_display = tempo_atual;
         }
         
         // Dar tempo para o LwIP processar pacotes recebidos
