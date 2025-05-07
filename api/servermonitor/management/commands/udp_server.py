@@ -4,6 +4,8 @@ import threading
 import time
 from django.core.management.base import BaseCommand
 from servermonitor.models import ServerStatus, Temperature
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 #python3 manage.py udp_server --ip=10.8.45.122 --porta=4444
 
@@ -14,6 +16,7 @@ class Command(BaseCommand):
         super().__init__(*args, **kwargs)
         self.running = False
         self.server_socket = None
+        self.channel_layer = get_channel_layer()
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -76,11 +79,29 @@ class Command(BaseCommand):
                         temperatura = dados_json.get('temperatura')
                         
                         # Salvar no banco de dados
-                        Temperature.objects.create(
+                        temp_obj = Temperature.objects.create(
                             temperature=temperatura
                         )
                         
                         self.stdout.write(self.style.SUCCESS(f'Dados de temperatura salvos: {temperatura}°C'))
+                        
+                        # Enviar dados para WebSocket
+                        try:
+                            async_to_sync(self.channel_layer.group_send)(
+                                'server_monitor',
+                                {
+                                    'type': 'server_update',
+                                    'message_type': 'temperature',
+                                    'data': {
+                                        'id': temp_obj.id,
+                                        'temperature': temp_obj.temperature,
+                                        'data_received': temp_obj.data_received.isoformat()
+                                    }
+                                }
+                            )
+                            self.stdout.write(self.style.SUCCESS('Dados de temperatura enviados via WebSocket'))
+                        except Exception as ws_error:
+                            self.stdout.write(self.style.ERROR(f'Erro ao enviar via WebSocket: {str(ws_error)}'))
                     else:
                         # Processar dados de status do servidor (joystick e botões)
                         # Mapear valores booleanos para as escolhas do modelo
@@ -88,7 +109,7 @@ class Command(BaseCommand):
                         botao2 = '0' if dados_json.get('botao2', False) else '1'
                         
                         # Salvar no banco de dados
-                        ServerStatus.objects.create(
+                        status_obj = ServerStatus.objects.create(
                             button_one=botao1,
                             button_two=botao2,
                             joystick_x=dados_json.get('joystick_x', 2000),
@@ -97,6 +118,28 @@ class Command(BaseCommand):
                         )
                         
                         self.stdout.write(self.style.SUCCESS(f'Dados de status salvos: {dados_json}'))
+                        
+                        # Enviar dados para WebSocket
+                        try:
+                            async_to_sync(self.channel_layer.group_send)(
+                                'server_monitor',
+                                {
+                                    'type': 'server_update',
+                                    'message_type': 'server_status',
+                                    'data': {
+                                        'id': status_obj.id,
+                                        'button_one': status_obj.button_one,
+                                        'button_two': status_obj.button_two,
+                                        'joystick_x': status_obj.joystick_x,
+                                        'joystick_y': status_obj.joystick_y,
+                                        'direction': status_obj.direction,
+                                        'data_received': status_obj.data_received.isoformat()
+                                    }
+                                }
+                            )
+                            self.stdout.write(self.style.SUCCESS('Dados de status enviados via WebSocket'))
+                        except Exception as ws_error:
+                            self.stdout.write(self.style.ERROR(f'Erro ao enviar via WebSocket: {str(ws_error)}'))
                     
                     # Opcionalmente, enviar uma resposta de confirmação
                     resposta = json.dumps({"status": "ok", "message": "Dados recebidos com sucesso"})

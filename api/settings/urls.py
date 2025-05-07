@@ -17,6 +17,9 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+# Nota: As rotas WebSocket são manipuladas pelo ASGI application em settings/asgi.py
+# e seguem o padrão definido em servermonitor/routing.py (ws/monitor/)
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('servermonitor.urls')),
