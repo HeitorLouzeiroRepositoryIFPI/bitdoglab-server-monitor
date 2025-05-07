@@ -113,13 +113,13 @@ const TemperatureDisplay = () => {
   const fetchTemperatureData = async () => {
     try {
       // Buscar temperatura atual
-      const currentResponse = await axios.get('http://127.0.0.1:8000/api/temperature/latest/');
+      const currentResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/temperature/latest/`);
       if (currentResponse.data && currentResponse.data.length > 0) {
         setCurrentTemp(currentResponse.data[0]);
       }
       
       // Buscar histórico de temperatura
-      const historyResponse = await axios.get('http://127.0.0.1:8000/api/temperature/history/');
+      const historyResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/temperature/history/`);
       if (historyResponse.data && historyResponse.data.length > 0) {
         setTempHistory(historyResponse.data);
       }

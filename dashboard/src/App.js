@@ -7,6 +7,10 @@ import JoystickVisualizer from './components/JoystickVisualizer';
 import ButtonStatusPanel from './components/ButtonStatusPanel';
 import Header from './components/Header';
 import TemperatureDisplay from './components/TemperatureDisplay';
+import AlertNotification from './components/AlertNotification';
+
+// Environment variables
+const API_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8001';
 
 // Temas claro e escuro
 const lightTheme = {
@@ -176,25 +180,34 @@ const Spinner = styled.div`
 function App() {
   const [serverStatus, setServerStatus] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [darkMode, setDarkMode] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState(true);
+  const [alertInfo, setAlertInfo] = useState({ visible: false, message: '', type: 'error' });
+
+  // Função para fechar o alerta
+  const handleCloseAlert = () => {
+    setAlertInfo({ ...alertInfo, visible: false });
+  };
+
+  // Função para mostrar um alerta
+  const showAlert = (message, type = 'error') => {
+    setAlertInfo({ visible: true, message, type });
+  };
 
   // Função para buscar dados da API
   const fetchData = async () => {
     try {
       // URL da API Django
-      const response = await axios.get('http://127.0.0.1:8000/api/status/latest/');
+      const response = await axios.get(`${API_URL}/api/status/latest/`);
       if (response.data && response.data.length > 0) {
         setServerStatus(response.data[0]);
         setConnectionStatus(true);
       }
       setLoading(false);
-      setError(null); // Clear any previous errors
     } catch (err) {
       console.error('Erro ao buscar dados:', err);
-      // Show alert instead of error page
-      alert('Não foi possível conectar ao servidor. Verifique se a API está rodando.');
+      // Usando o alerta personalizado em vez do alert() padrão
+      showAlert('Não foi possível conectar ao servidor. Verifique se a API está rodando.', 'error');
       setConnectionStatus(false);
       // Keep using the last server status we had
       setLoading(false);
@@ -215,7 +228,7 @@ function App() {
     }, 2000);
     
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchData]); // Adicionando fetchData como dependência
 
   if (loading) {
     return (
@@ -239,6 +252,15 @@ function App() {
           darkMode={darkMode} 
           connectionStatus={connectionStatus}
         />
+        
+        {/* Renderiza o alerta personalizado quando visível */}
+        {alertInfo.visible && (
+          <AlertNotification 
+            message={alertInfo.message}
+            type={alertInfo.type}
+            onClose={handleCloseAlert}
+          />
+        )}
         
         <DashboardContainer>
           <ServerStatusArea>
