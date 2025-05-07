@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled, { useTheme } from 'styled-components';
 import ReactApexChart from 'react-apexcharts';
 import axios from 'axios';
+import socketService from '../services/websocket';
 
 // Container principal com efeito de vidro
 const TemperatureContainer = styled.div`
@@ -109,17 +110,17 @@ const TemperatureDisplay = () => {
   const [loading, setLoading] = useState(true);
   const theme = useTheme();
   
-  // Buscar dados de temperatura
+  // Buscar dados de temperatura (usado apenas como fallback)
   const fetchTemperatureData = async () => {
     try {
       // Buscar temperatura atual
-      const currentResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/temperature/latest/`);
+      const currentResponse = await axios.get(`${process.env.REACT_APP_API_URL || 'http://127.0.0.1:8001'}/api/temperature/latest/`);
       if (currentResponse.data && currentResponse.data.length > 0) {
         setCurrentTemp(currentResponse.data[0]);
       }
       
       // Buscar histórico de temperatura
-      const historyResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/temperature/history/`);
+      const historyResponse = await axios.get(`${process.env.REACT_APP_API_URL || 'http://127.0.0.1:8001'}/api/temperature/history/`);
       if (historyResponse.data && historyResponse.data.length > 0) {
         setTempHistory(historyResponse.data);
       }
@@ -132,14 +133,43 @@ const TemperatureDisplay = () => {
   };
   
   useEffect(() => {
+    // Buscar dados iniciais como fallback
     fetchTemperatureData();
     
-    // Atualizar a cada 1 minuto
-    const interval = setInterval(() => {
-      fetchTemperatureData();
-    }, 60000);
+    // Adicionar listener para atualizações de temperatura via WebSocket
+    const temperatureListener = socketService.addListener('temperature', (data) => {
+      if (data) {
+        // Atualizar temperatura atual
+        setCurrentTemp(data);
+        
+        // Adicionar à lista de histórico (mantendo os últimos 20 itens)
+        setTempHistory(prevHistory => {
+          const newHistory = [...prevHistory];
+          // Verificar se já existe um item com o mesmo ID
+          const existingIndex = newHistory.findIndex(item => item.id === data.id);
+          
+          if (existingIndex >= 0) {
+            // Substituir o item existente
+            newHistory[existingIndex] = data;
+          } else {
+            // Adicionar novo item
+            newHistory.push(data);
+          }
+          
+          // Ordenar por data e manter apenas os últimos 20 itens
+          return newHistory
+            .sort((a, b) => new Date(a.data_received) - new Date(b.data_received))
+            .slice(-20);
+        });
+        
+        setLoading(false);
+      }
+    });
     
-    return () => clearInterval(interval);
+    // Limpeza quando o componente é desmontado
+    return () => {
+      temperatureListener();
+    };
   }, []);
   
   // Configuração do gráfico

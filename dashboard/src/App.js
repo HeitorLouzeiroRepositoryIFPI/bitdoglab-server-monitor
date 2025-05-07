@@ -8,6 +8,7 @@ import ButtonStatusPanel from './components/ButtonStatusPanel';
 import Header from './components/Header';
 import TemperatureDisplay from './components/TemperatureDisplay';
 import AlertNotification from './components/AlertNotification';
+import socketService from './services/websocket';
 
 // Environment variables
 const API_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8001';
@@ -181,7 +182,7 @@ function App() {
   const [serverStatus, setServerStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState(false);
   const [alertInfo, setAlertInfo] = useState({ visible: false, message: '', type: 'error' });
 
   // Função para fechar o alerta
@@ -194,7 +195,7 @@ function App() {
     setAlertInfo({ visible: true, message, type });
   };
 
-  // Função para buscar dados da API
+  // Função para buscar dados da API (usada apenas no carregamento inicial como fallback)
   const fetchData = async () => {
     try {
       // URL da API Django
@@ -207,9 +208,8 @@ function App() {
     } catch (err) {
       console.error('Erro ao buscar dados:', err);
       // Usando o alerta personalizado em vez do alert() padrão
-      showAlert('Não foi possível conectar ao servidor. Verifique se a API está rodando.', 'error');
+      showAlert('Não foi possível conectar ao servidor. Conectando via WebSocket...', 'warning');
       setConnectionStatus(false);
-      // Keep using the last server status we had
       setLoading(false);
     }
   };
@@ -219,16 +219,43 @@ function App() {
     setDarkMode(!darkMode);
   };
 
-  // Buscar dados na primeira renderização e depois a cada 2 segundos
+  // Configurar WebSocket na primeira renderização
   useEffect(() => {
+    // Tentar buscar dados iniciais via API REST, como fallback
     fetchData();
     
-    const interval = setInterval(() => {
-      fetchData();
-    }, 2000);
+    // Configurar WebSocket
+    socketService.connect();
     
-    return () => clearInterval(interval);
-  }, [fetchData]); // Adicionando fetchData como dependência
+    // Adicionar listeners para WebSocket
+    const serverStatusListener = socketService.addListener('serverStatus', (data) => {
+      if (data) {
+        setServerStatus(data);
+        setConnectionStatus(true);
+        setLoading(false);
+      }
+    });
+    
+    // Listener para conexão estabelecida
+    const connectListener = socketService.addListener('connect', () => {
+      setConnectionStatus(true);
+      showAlert('Conexão WebSocket estabelecida com sucesso!', 'success');
+    });
+    
+    // Listener para desconexão
+    const disconnectListener = socketService.addListener('disconnect', () => {
+      setConnectionStatus(false);
+      showAlert('Conexão WebSocket perdida. Tentando reconectar...', 'warning');
+    });
+    
+    // Limpeza quando o componente é desmontado
+    return () => {
+      serverStatusListener();
+      connectListener();
+      disconnectListener();
+      socketService.disconnect();
+    };
+  }, []); // Array de dependências vazio para executar apenas uma vez
 
   if (loading) {
     return (

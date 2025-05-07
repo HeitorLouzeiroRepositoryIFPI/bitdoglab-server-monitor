@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
     command: >
       sh -c "python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8001 & 
+             daphne -b 0.0.0.0 -p 8001 settings.asgi:application & 
              python manage.py udp_server --ip=0.0.0.0 --porta=4444"
 
   dashboard:
@@ -32,3 +32,6 @@ services:
     env_file:
       - ./.env
     restart: unless-stopped
+    environment:
+      - REACT_APP_API_URL=http://localhost:8001
+      - REACT_APP_API_PORT=8001
