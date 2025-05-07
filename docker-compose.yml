@@ -11,9 +11,7 @@ services:
     volumes:
       - ./api:/app
     env_file:
-      - ./api/.env
-    environment:
-      - DEBUG=1
+      - ./.env
     restart: unless-stopped
     command: >
       sh -c "python manage.py migrate &&
@@ -31,6 +29,6 @@ services:
       - /app/node_modules
     depends_on:
       - api
-    environment:
-      - REACT_APP_API_URL=http://localhost:8001
+    env_file:
+      - ./.env
     restart: unless-stopped

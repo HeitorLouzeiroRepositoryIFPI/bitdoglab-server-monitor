@@ -14,12 +14,16 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
-# Carrega as variáveis de ambiente do arquivo .env
-load_dotenv()
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = BASE_DIR.parent  # Diretório raiz do projeto
 
+# Tenta carregar o arquivo .env da raiz do projeto primeiro
+if os.path.exists(os.path.join(PROJECT_ROOT, '.env')):
+    load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
+else:
+    # Caso contrário, carrega do diretório da API
+    load_dotenv()
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
