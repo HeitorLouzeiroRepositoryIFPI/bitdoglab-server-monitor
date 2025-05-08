@@ -48,7 +48,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
-    'servermonitor'
+    'servermonitor',
+    'channels'
 ]
 
 MIDDLEWARE = [
@@ -141,3 +142,10 @@ CORS_ALLOW_ALL_ORIGINS = True  # Permite todas as origens - para desenvolvimento
 # CORS_ALLOWED_ORIGINS = [
 #     "http://localhost:3000",
 # ]
+
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    },
+}

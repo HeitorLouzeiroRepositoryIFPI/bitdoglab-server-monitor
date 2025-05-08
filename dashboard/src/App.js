@@ -8,6 +8,7 @@ import ButtonStatusPanel from './components/ButtonStatusPanel';
 import Header from './components/Header';
 import TemperatureDisplay from './components/TemperatureDisplay';
 import AlertNotification from './components/AlertNotification';
+import SystemStatsPanel from './components/SystemStatsPanel';
 
 // Environment variables
 const API_URL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8001';
@@ -74,15 +75,17 @@ const DashboardContainer = styled.div`
   padding: 20px;
   display: grid;
   grid-template-columns: repeat(12, 1fr);
-  grid-template-rows: auto auto;
+  grid-template-rows: auto auto auto;
   grid-template-areas: 
     "server server server server joystick joystick joystick joystick button button button button"
+    "stats stats stats stats stats stats stats stats stats stats stats stats"
     "temp temp temp temp temp temp temp temp temp temp temp temp";
   gap: 20px;
   
   @media (max-width: 992px) {
     grid-template-areas: 
       "server server server server joystick joystick joystick joystick button button button button"
+      "stats stats stats stats stats stats stats stats stats stats stats stats"
       "temp temp temp temp temp temp temp temp temp temp temp temp";
   }
   
@@ -92,6 +95,7 @@ const DashboardContainer = styled.div`
       "server"
       "joystick"
       "button"
+      "stats"
       "temp";
   }
 `;
@@ -135,6 +139,19 @@ const TemperatureArea = styled.div`
   @keyframes fadeIn {
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+`;
+
+const StatsArea = styled.div`
+  grid-area: stats;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  opacity: 0;
+  animation: fadeIn 0.5s ease forwards;
+  animation-delay: 0.2s;
+  
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: ${props => props.theme.shadow};
   }
 `;
 
@@ -183,6 +200,8 @@ function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState(true);
   const [alertInfo, setAlertInfo] = useState({ visible: false, message: '', type: 'error' });
+  const [startTime] = useState(new Date()); // Tempo de início da sessão
+  const [totalReadings, setTotalReadings] = useState(0); // Total de leituras recebidas
 
   // Função para fechar o alerta
   const handleCloseAlert = () => {
@@ -202,6 +221,7 @@ function App() {
       if (response.data && response.data.length > 0) {
         setServerStatus(response.data[0]);
         setConnectionStatus(true);
+        setTotalReadings(prev => prev + 1); // Incrementa o contador de leituras
       }
       setLoading(false);
     } catch (err) {
@@ -285,6 +305,13 @@ function App() {
           <TemperatureArea>
             <TemperatureDisplay />
           </TemperatureArea>
+          
+          <StatsArea>
+            <SystemStatsPanel 
+              startTime={startTime}
+              totalReadings={totalReadings}
+            />
+          </StatsArea>
         </DashboardContainer>
         
         <ThemeToggleButton onClick={toggleTheme}>
