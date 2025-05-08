@@ -81,6 +81,15 @@ class Command(BaseCommand):
                         temperatura = dados_json.get('temperatura')
                         result = await save_temperature_async(temperatura)
                         self.stdout.write(self.style.SUCCESS(result))
+                        # Buscar o registro salvo
+                        latest_temp = await sync_to_async(lambda: Temperature.objects.order_by('-data_received').first())()
+                        if latest_temp:
+                            temp_data = {
+                                'type': 'temperature',
+                                'value': latest_temp.temperature,
+                                'timestamp': latest_temp.data_received.isoformat()
+                            }
+                            await websocket.send(json.dumps(temp_data))
                     else:
                         botao1 = '0' if dados_json.get('botao1', False) else '1'
                         botao2 = '0' if dados_json.get('botao2', False) else '1'
@@ -90,6 +99,19 @@ class Command(BaseCommand):
 
                         result = await save_server_status_async(botao1, botao2, joystick_x, joystick_y, direction)
                         self.stdout.write(self.style.SUCCESS(f'{result}: {dados_json}'))
+                        # Buscar o registro salvo
+                        latest_status = await sync_to_async(lambda: ServerStatus.objects.order_by('-data_received').first())()
+                        if latest_status:
+                            status_data = {
+                                'type': 'server_status',
+                                'button_one': latest_status.button_one,
+                                'button_two': latest_status.button_two,
+                                'joystick_x': latest_status.joystick_x,
+                                'joystick_y': latest_status.joystick_y,
+                                'direction': latest_status.direction,
+                                'timestamp': latest_status.data_received.isoformat()
+                            }
+                            await websocket.send(json.dumps(status_data))
 
                     # Enviar uma resposta de confirmação
                     resposta = json.dumps({"status": "ok", "message": "Dados recebidos com sucesso"})

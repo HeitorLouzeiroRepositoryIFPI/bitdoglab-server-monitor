@@ -1,14 +1,13 @@
 import os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'settings.settings')
+import django
 
-import sys
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'settings.settings')
+django.setup()  # Inicializa o Django antes de importar os outros módulos
 
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
-from servermonitor.routing import websocket_urlpatterns
 from django.core.asgi import get_asgi_application
-
-
+from servermonitor.routing import websocket_urlpatterns
 
 application = ProtocolTypeRouter({
     "http": get_asgi_application(),
