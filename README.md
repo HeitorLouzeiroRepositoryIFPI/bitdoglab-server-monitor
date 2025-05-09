@@ -45,9 +45,6 @@ DATABASE_ENGINE=django.db.backends.sqlite3
 DATABASE_NAME=db.sqlite3
 API_HOST=localhost
 API_PORT=8001
-
-# React Dashboard Settings
-REACT_APP_API_URL=http://localhost:8001
 ```
 
 ### 2. Subindo os Serviços com Docker
