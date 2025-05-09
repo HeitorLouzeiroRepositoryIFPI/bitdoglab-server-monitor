@@ -219,16 +219,16 @@ function App() {
     setDarkMode(!darkMode);
   };
 
-  // Buscar dados na primeira renderização e depois a cada 2 segundos
+  // Buscar dados na primeira renderização e depois a cada 5 segundos
   useEffect(() => {
     fetchData();
-    
+
     const interval = setInterval(() => {
       fetchData();
-    }, 2000);
-    
+    }, 5000); // Alterado de 2 segundos para 5 segundos
+
     return () => clearInterval(interval);
-  }, [fetchData]); // Adicionando fetchData como dependência
+  }, []); // Removida a dependência fetchData para evitar loops desnecessários
 
   if (loading) {
     return (
