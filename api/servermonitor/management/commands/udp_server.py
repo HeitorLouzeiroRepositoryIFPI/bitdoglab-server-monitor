@@ -5,8 +5,6 @@ import time
 from django.core.management.base import BaseCommand
 from servermonitor.models import ServerStatus, Temperature
 
-#python3 manage.py udp_server --ip=10.8.45.122 --porta=4444
-
 class Command(BaseCommand):
     help = 'Inicia um servidor UDP para receber dados do dispositivo Pico W'
 
@@ -26,18 +24,19 @@ class Command(BaseCommand):
             '--ip',
             type=str,
             default='0.0.0.0',
-            help='Endereço IP para escutar (padrão: 0.0.0.0)'
+            help='Endereço IP para escutar (padrão: 0.0.0.0). Para verificar o IP da máquina, use o comando "ifconfig" no Linux ou "ipconfig" no Windows.'
         )
 
     def handle(self, *args, **options):
         ip = options['ip']
         porta = options['porta']
-        
+
         self.stdout.write(self.style.SUCCESS(f'Iniciando servidor UDP em {ip}:{porta}'))
-        
+        self.stdout.write(self.style.WARNING('Certifique-se de que o IP configurado é acessível pela rede e que a porta não está bloqueada por firewall.'))
+
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.server_socket.bind((ip, porta))
-        
+
         self.running = True
         
         # Iniciar thread para receber mensagens
