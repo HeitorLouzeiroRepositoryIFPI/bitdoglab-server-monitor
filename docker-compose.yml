@@ -1,0 +1,32 @@
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+      - "4444:4444/udp"  # Expondo a porta UDP para o servidor UDP
+    volumes:
+      - ./api:/app
+    env_file:
+      - ./.env
+    restart: unless-stopped
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8001 & 
+             python manage.py udp_server --ip=0.0.0.0 --porta=4444"
+
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./dashboard:/app
+      - /app/node_modules
+    depends_on:
+      - api
+    env_file:
+      - ./.env
+    restart: unless-stopped
