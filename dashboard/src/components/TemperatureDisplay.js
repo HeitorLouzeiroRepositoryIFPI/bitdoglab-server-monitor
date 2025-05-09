@@ -112,21 +112,24 @@ const TemperatureDisplay = () => {
   // Buscar dados de temperatura
   const fetchTemperatureData = async () => {
     try {
+      const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000'; // Fallback URL
+      console.log('API URL:', process.env.REACT_APP_API_URL);
       // Buscar temperatura atual
-      const currentResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/temperature/latest/`);
+      const currentResponse = await axios.get(`${baseUrl}/api/temperature/latest/`);
       if (currentResponse.data && currentResponse.data.length > 0) {
         setCurrentTemp(currentResponse.data[0]);
       }
       
       // Buscar histórico de temperatura
-      const historyResponse = await axios.get(`${process.env.REACT_APP_API_URL}/api/temperature/history/`);
+      const historyResponse = await axios.get(`${baseUrl}/api/temperature/history/`);
       if (historyResponse.data && historyResponse.data.length > 0) {
         setTempHistory(historyResponse.data);
       }
       
       setLoading(false);
     } catch (err) {
-      console.error('Erro ao buscar dados de temperatura:', err);
+      console.error('Erro ao buscar dados de temperatura:', err.message);
+      console.error('Detalhes do erro:', err.response?.data || err);
       setLoading(false);
     }
   };

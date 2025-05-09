@@ -225,7 +225,7 @@ function App() {
 
     const interval = setInterval(() => {
       fetchData();
-    }, 5000); // Alterado de 2 segundos para 5 segundos
+    }, 2000);
 
     return () => clearInterval(interval);
   }, []); // Removida a dependência fetchData para evitar loops desnecessários
