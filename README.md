@@ -182,9 +182,6 @@ Certifique-se de salvar as alterações e recompilar o código para que as novas
 ### Tela 1
 ![Tela 1](.github/tela1.png)
 
-### Tela 2
-![Tela 2](.github/tela2.png)
-
 ## Licença
 
 Este projeto é licenciado sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
@@ -195,4 +192,4 @@ Para mais informações ou dúvidas sobre o projeto, entre em contato:
 
 - **Email**: heitorlouzeirodev@gmail.com
 - **Linkedin**: [https://www.linkedin.com/in/heitor-louzeiro/](https://www.linkedin.com/in/heitor-louzeiro/)
-- **GitHub**: [https://github.com/HeitorLouzeiro](hhttps://github.com/HeitorLouzeiro)
+- **GitHub**: [https://github.com/HeitorLouzeiro](https://github.com/HeitorLouzeiro)
